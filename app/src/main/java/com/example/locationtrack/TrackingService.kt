@@ -79,6 +79,8 @@ class TrackingService : Service() {
 
             //Stop the Service//
             stopSelf()
+            // Optional: Android should manage itself -> no need to use exitProcess(0)
+
         }
     }
 
@@ -124,7 +126,7 @@ class TrackingService : Service() {
 
         //If the app currently has access to the location permission...//
         if (permission == PackageManager.PERMISSION_GRANTED) {
-            Log.d("PERMISS", "permission granted $permission")
+            Log.d("PERMISSIONS", "permission granted $permission")
             //...then request location updates//
             client.requestLocationUpdates(request, object : LocationCallback() {
 
@@ -133,13 +135,6 @@ class TrackingService : Service() {
                     val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
                             + "/" + Random.nextInt().toString())
                     val location = locationResult.lastLocation
-
-                    /*if (location.altitude.isNaN()){
-                        location.altitude = 0.0
-                    }
-                    if (location.speed.isNaN()){
-                        location.speed = 0.0F
-                    }*/
 
                     //Save the location data to the database//
                     Log.d("FirebaseLog", " $ref -- $location")
