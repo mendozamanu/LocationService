@@ -47,13 +47,14 @@ class MainActivity : AppCompatActivity() {
     ) {
 
         //If the permission has been granted...//
-        if (requestCode == PERMISSIONS_REQUEST && grantResults.size == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == PERMISSIONS_REQUEST && grantResults.size == 1 &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 
         //...then start the GPS tracking service//
             startTrackerService()
         } else {
 
-            //If the user denies the permission request, then display a toast with some more information//
+        //If the user denies the permission request, then display a toast with more information//
             Toast.makeText(
                 this,
                 "Please enable location services to allow GPS tracking",

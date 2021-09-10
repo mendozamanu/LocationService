@@ -79,6 +79,7 @@ class TrackingService : Service() {
 
             //Stop the Service//
             stopSelf()
+            Log.d("Stopped", "Service stopped")
             // Optional: Android should manage itself -> no need to use exitProcess(0)
 
         }
