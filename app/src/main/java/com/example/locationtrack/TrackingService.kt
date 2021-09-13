@@ -10,7 +10,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
@@ -79,7 +79,7 @@ class TrackingService : Service() {
 
             //Stop the Service//
             stopSelf()
-            Log.d("Stopped", "Service stopped")
+            //Log.d("Stopped", "Service stopped")
             // Optional: Android should manage itself -> no need to use exitProcess(0)
 
         }
@@ -100,11 +100,15 @@ class TrackingService : Service() {
 
                 //...then call requestLocationUpdates//
                 requestLocationUpdates()
-                Log.d("LoginOK", "requesting updates...")
+                //Log.d("LoginOK", "requesting updates...")
             } else {
-
+                Toast.makeText(
+                    this,
+                    "Firebase authentication error. Try again or contact admin",
+                    Toast.LENGTH_SHORT
+                ).show()
                 //If sign in fails, then log the error//
-                Log.d(TAG, "Firebase authentication failed")
+                //Log.d(TAG, "Firebase authentication failed")
             }
         }
     }
@@ -127,7 +131,7 @@ class TrackingService : Service() {
 
         //If the app currently has access to the location permission...//
         if (permission == PackageManager.PERMISSION_GRANTED) {
-            Log.d("PERMISSIONS", "permission granted $permission")
+            //Log.d("PERMISSIONS", "permission granted $permission")
             //...then request location updates//
             client.requestLocationUpdates(request, object : LocationCallback() {
 
@@ -138,7 +142,7 @@ class TrackingService : Service() {
                     val location = locationResult.lastLocation
 
                     //Save the location data to the database//
-                    Log.d("FirebaseLog", " $ref -- $location")
+                    //Log.d("FirebaseLog", " $ref -- $location")
                     ref.setValue(location)
 
                     //ref.child("users").child(uId.toString()).child("location").setValue(location)

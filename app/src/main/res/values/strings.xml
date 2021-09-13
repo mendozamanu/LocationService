@@ -6,4 +6,5 @@
     <string name="firebase_path">https://locattracking-default-rtdb.europe-west1.firebasedatabase.app/</string>
     <string name="channel_name">Main</string>
     <string name="channel_description">Main tracking persistent notification</string>
+    <string name="enable">Enable</string>
 </resources>
