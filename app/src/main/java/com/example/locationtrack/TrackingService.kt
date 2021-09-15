@@ -22,6 +22,11 @@ import com.google.firebase.database.FirebaseDatabase
 import kotlin.random.Random
 
 
+/*class FirebaseUtils {
+    val fireStoreDatabase = FirebaseFirestore.getInstance()
+
+}*/
+
 class TrackingService : Service() {
     override fun onBind(intent: Intent): IBinder? {
         return null
@@ -97,7 +102,6 @@ class TrackingService : Service() {
         ).addOnCompleteListener { task ->
             //If the user has been authenticated...//
             if (task.isSuccessful) {
-
                 //...then call requestLocationUpdates//
                 requestLocationUpdates()
                 //Log.d("LoginOK", "requesting updates...")
@@ -108,7 +112,7 @@ class TrackingService : Service() {
                     Toast.LENGTH_SHORT
                 ).show()
                 //If sign in fails, then log the error//
-                //Log.d(TAG, "Firebase authentication failed")
+                //Log.e(FIREBASE_AUTH, "Firebase authentication failed")
             }
         }
     }
@@ -131,21 +135,32 @@ class TrackingService : Service() {
 
         //If the app currently has access to the location permission...//
         if (permission == PackageManager.PERMISSION_GRANTED) {
-            //Log.d("PERMISSIONS", "permission granted $permission")
+
             //...then request location updates//
             client.requestLocationUpdates(request, object : LocationCallback() {
 
                 override fun onLocationResult(locationResult: LocationResult) {
+                    //val ref = FirebaseUtils().fireStoreDatabase.collection("users/$uid/location/")
+
                     //Get a reference to the database, so your app can perform R & W operations//
                     val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
                             + "/" + Random.nextInt().toString())
+
                     val location = locationResult.lastLocation
-
                     //Save the location data to the database//
-                    //Log.d("FirebaseLog", " $ref -- $location")
-                    ref.setValue(location)
 
-                    //ref.child("users").child(uId.toString()).child("location").setValue(location)
+                    //Creating a location map without unnecessary data
+                    val entry = mapOf("accuracy" to location.accuracy, "latitude"
+                            to location.latitude, "longitude" to location.longitude,
+                            "speed" to location.speed, "time" to location.time)
+
+                    ref.setValue(entry)
+
+                    /*ref.add(entry)
+                        .addOnSuccessListener {
+                            Log.d("DB", "Added document with ID ${it.id}")
+                        }
+                    */
                 }
             }, null)
         }
@@ -153,8 +168,7 @@ class TrackingService : Service() {
     }
 
     companion object {
-        private val TAG = TrackingService::class.java.simpleName
         private const val CHANNEL_ID = 1945
-        val uid = Random.nextInt().toString()
+        val uid = kotlin.math.abs(Random.nextInt()).toString()
     }
 }

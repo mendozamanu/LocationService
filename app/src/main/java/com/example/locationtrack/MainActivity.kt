@@ -40,31 +40,19 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
         else {
-            if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || !lm.isProviderEnabled(
-                    LocationManager.NETWORK_PROVIDER
-                )
-            ) {
-                Toast.makeText(
-                    this,
-                    "Location disabled. Please enable location on your device",
-                    Toast.LENGTH_SHORT
-                ).show()
-                finish()
-            } else {
-                val permission = ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                )
+            val permission = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
 
-                if (permission == PackageManager.PERMISSION_GRANTED) {
-                    startTrackerService() //If permission granted
-                } else { //request access
-                    ActivityCompat.requestPermissions(
-                        this,
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                        PERMISSIONS_REQUEST
-                    )
-                }
+            if (permission == PackageManager.PERMISSION_GRANTED) {
+                startTrackerService() //If permission granted
+            } else { //request access
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    PERMISSIONS_REQUEST
+                )
             }
         }
         //setContentView(R.layout.activity_main)
