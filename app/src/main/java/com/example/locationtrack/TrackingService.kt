@@ -92,6 +92,9 @@ class TrackingService : Service() {
 
     private fun loginToFirebase() {
 
+        //Add here AppCheck to allow only the app to access to the firebase project
+        //https://firebase.google.com/docs/app-check/android/safetynet-provider?authuser=0#kotlin+ktx
+
         //Authenticate with Firebase, using the email and password we created earlier//
         val email = getString(R.string.test_email)
         val password = getString(R.string.test_password)
@@ -121,8 +124,12 @@ class TrackingService : Service() {
     private fun requestLocationUpdates() {
         val request = LocationRequest.create()
 
+        // API Ref for Location:
+        // https://developer.android.com/reference/android/location/Location?hl=es-419
+
         //Specify how often your app should request the device’s location//
-        request.interval = 10000 //ms
+        request.interval = 15000 //ms
+        request.fastestInterval = 9000 //ms
 
         //Get the most accurate location data available//
         request.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
@@ -130,8 +137,7 @@ class TrackingService : Service() {
         val path = getString(R.string.firebase_path)
         val permission = ContextCompat.checkSelfPermission(
             this,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
+            Manifest.permission.ACCESS_FINE_LOCATION)
 
         //If the app currently has access to the location permission...//
         if (permission == PackageManager.PERMISSION_GRANTED) {
@@ -144,7 +150,7 @@ class TrackingService : Service() {
 
                     //Get a reference to the database, so your app can perform R & W operations//
                     val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
-                            + "/" + Random.nextInt().toString())
+                            + "/" + kotlin.math.abs(Random.nextInt()).toString())
 
                     val location = locationResult.lastLocation
                     //Save the location data to the database//
@@ -154,6 +160,7 @@ class TrackingService : Service() {
                             to location.latitude, "longitude" to location.longitude,
                             "speed" to location.speed, "time" to location.time)
 
+                    //Log.d("Location", "Location: $entry")
                     ref.setValue(entry)
 
                     /*ref.add(entry)
