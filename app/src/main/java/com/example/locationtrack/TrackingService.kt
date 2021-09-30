@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -18,14 +19,14 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlin.random.Random
 
 
-/*class FirebaseUtils {
+class FirebaseUtils {
     val fireStoreDatabase = FirebaseFirestore.getInstance()
 
-}*/
+}
 
 class TrackingService : Service() {
     override fun onBind(intent: Intent): IBinder? {
@@ -134,7 +135,7 @@ class TrackingService : Service() {
         //Get the most accurate location data available//
         request.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         val client = LocationServices.getFusedLocationProviderClient(this)
-        val path = getString(R.string.firebase_path)
+        //val path = getString(R.string.firebase_path)
         val permission = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.ACCESS_FINE_LOCATION)
@@ -146,11 +147,13 @@ class TrackingService : Service() {
             client.requestLocationUpdates(request, object : LocationCallback() {
 
                 override fun onLocationResult(locationResult: LocationResult) {
-                    //val ref = FirebaseUtils().fireStoreDatabase.collection("users/$uid/location/")
-
+                    val oref = FirebaseUtils().fireStoreDatabase.document("users/$uid/")
+                    oref.set(mapOf("uid" to uid))
+                    val ref = FirebaseUtils().fireStoreDatabase.collection(
+                        "users/$uid/location/")
                     //Get a reference to the database, so your app can perform R & W operations//
-                    val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
-                            + "/" + kotlin.math.abs(Random.nextInt()).toString())
+                    //val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
+                    //        + "/" + kotlin.math.abs(Random.nextInt()).toString())
 
                     val location = locationResult.lastLocation
                     //Save the location data to the database//
@@ -161,17 +164,15 @@ class TrackingService : Service() {
                             "speed" to location.speed, "time" to location.time)
 
                     //Log.d("Location", "Location: $entry")
-                    ref.setValue(entry)
+                    //ref.setValue(entry)
 
-                    /*ref.add(entry)
+                    ref.add(entry)
                         .addOnSuccessListener {
-                            Log.d("DB", "Added document with ID ${it.id}")
+                            Log.d("DB", "Added document with ID $uid")
                         }
-                    */
                 }
             }, null)
         }
-
     }
 
     companion object {
