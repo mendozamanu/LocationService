@@ -18,20 +18,36 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import io.realm.Realm
+import io.realm.RealmObject
+import io.realm.annotations.PrimaryKey
+import io.realm.kotlin.createObject
 import io.realm.mongodb.App
 import io.realm.mongodb.AppConfiguration
 import io.realm.mongodb.Credentials
 import io.realm.mongodb.User
-import kotlin.random.Random
+import io.realm.mongodb.sync.SyncConfiguration
+import org.bson.types.ObjectId
+
+
+
 
 
 class FirebaseUtils {
     val fireStoreDatabase = FirebaseFirestore.getInstance()
 
 }
+
+open class Location(
+    @PrimaryKey var _id: ObjectId? = null,
+    var accuracy: Float = 0.0F,
+    var latitude: Double = 0.0,
+    var longitude: Double = 0.0,
+    var speed: Float = 0.0F,
+    var time: Long = 0
+
+): RealmObject()
 
 class TrackingService : Service() {
     override fun onBind(intent: Intent): IBinder? {
@@ -88,6 +104,8 @@ class TrackingService : Service() {
             //Unregister the BroadcastReceiver when the notification is tapped//
             unregisterReceiver(this)
 
+            //Revisar el IntentReceiver de Realm
+
             //Stop the Service//
             stopSelf()
             //Log.d("Stopped", "Service stopped")
@@ -99,6 +117,7 @@ class TrackingService : Service() {
     private fun loginToMongo(){
 
         Realm.init(this)
+        //mongodb+srv://testuser:PanCakes@realmcluster.8nqr0.mongodb.net/locationUpdates?retryWrites=true&w=majority
         val appID = "location-track-timdi"
         val app = App(AppConfiguration.Builder(appID)
             .build())
@@ -106,10 +125,22 @@ class TrackingService : Service() {
         val emailPasswordCredentials: Credentials = Credentials.emailPassword(
             getString(R.string.test_email), getString(R.string.test_password)
         )
-        val user: User? = null
+        var user: User?
         app.loginAsync(emailPasswordCredentials){
             if (it.isSuccess){
                 Log.i("LoginOK", "Successfully authenticated with test user")
+                user = app.currentUser()
+                val partitionValue = "Location"
+                val config = SyncConfiguration.Builder(user!!, partitionValue)
+                    //RealmConfiguration.Builder.allowWritesOnUiThread(true)
+                    .build()
+                var realm: Realm
+                Realm.getInstanceAsync(config, object: Realm.Callback() {
+                    override fun onSuccess(_realm: Realm) {
+                        // the realm should live exactly as long as the activity, so assign the realm to a member variable
+                        realm = _realm
+                    }
+                })
                 requestLocationUpdates2()
             }
             else{
@@ -122,7 +153,7 @@ class TrackingService : Service() {
         }
 
     }
-
+/*
     private fun loginToFirebase() {
 
         //Add here AppCheck to allow only the app to access to the firebase project
@@ -152,10 +183,12 @@ class TrackingService : Service() {
             }
         }
     }
-
+*/
     //Initiate the request to track the device's location//
     private fun requestLocationUpdates2() {
         val request = LocationRequest.create()
+
+        //https://docs.mongodb.com/realm/sdk/android/examples/mongodb-remote-access/
 
         // API Ref for Location:
         // https://developer.android.com/reference/android/location/Location?hl=es-419
@@ -188,19 +221,28 @@ class TrackingService : Service() {
                     //Save the location data to the database//
 
                     //Creating a location map without unnecessary data
-                    val entry = mapOf("accuracy" to location.accuracy, "latitude"
-                            to location.latitude, "longitude" to location.longitude,
-                        "speed" to location.speed, "time" to location.time)
+                    //val entry = mapOf("accuracy" to location.accuracy, "latitude"
+                    //        to location.latitude, "longitude" to location.longitude,
+                    //    "speed" to location.speed, "time" to location.time)
 
-                    Log.d("Location", "Location: $entry")
+                    Log.d("Location", "Location: $location")
                     //ref.setValue(entry)
 
+                    val realm = Realm.getDefaultInstance()
+                    realm.executeTransactionAsync { realm ->
+                        val entry = realm.createObject<Location>(ObjectId())
+                        entry.accuracy = location.accuracy
+                        entry.latitude  = location.latitude
+                        entry.longitude = location.longitude
+                        entry.speed = location.speed
+                        entry.time = location.time
+                    }
 
                 }
             }, null)
         }
     }
-
+/*
     //Initiate the request to track the device's location//
     private fun requestLocationUpdates() {
         val request = LocationRequest.create()
@@ -254,9 +296,9 @@ class TrackingService : Service() {
             }, null)
         }
     }
-
+*/
     companion object {
         private const val CHANNEL_ID = 1945
-        val uid = kotlin.math.abs(Random.nextInt()).toString()
+        //val uid = kotlin.math.abs(Random.nextInt()).toString()
     }
 }
