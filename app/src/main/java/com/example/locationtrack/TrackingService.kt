@@ -20,6 +20,11 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import io.realm.Realm
+import io.realm.mongodb.App
+import io.realm.mongodb.AppConfiguration
+import io.realm.mongodb.Credentials
+import io.realm.mongodb.User
 import kotlin.random.Random
 
 
@@ -38,7 +43,7 @@ class TrackingService : Service() {
         super.onCreate()
         createNotificationChannel()
         buildNotification()
-        loginToFirebase()
+        loginToMongo()
     }
 
     private fun createNotificationChannel() {
@@ -91,6 +96,33 @@ class TrackingService : Service() {
         }
     }
 
+    private fun loginToMongo(){
+
+        Realm.init(this)
+        val appID = "location-track-timdi"
+        val app = App(AppConfiguration.Builder(appID)
+            .build())
+
+        val emailPasswordCredentials: Credentials = Credentials.emailPassword(
+            getString(R.string.test_email), getString(R.string.test_password)
+        )
+        val user: User? = null
+        app.loginAsync(emailPasswordCredentials){
+            if (it.isSuccess){
+                Log.i("LoginOK", "Successfully authenticated with test user")
+                requestLocationUpdates2()
+            }
+            else{
+                Toast.makeText(
+                    this,
+                    "MongoDB realm authentication error. Try again or contact admin",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+    }
+
     private fun loginToFirebase() {
 
         //Add here AppCheck to allow only the app to access to the firebase project
@@ -107,7 +139,7 @@ class TrackingService : Service() {
             //If the user has been authenticated...//
             if (task.isSuccessful) {
                 //...then call requestLocationUpdates//
-                requestLocationUpdates()
+                requestLocationUpdates2()
                 //Log.d("LoginOK", "requesting updates...")
             } else {
                 Toast.makeText(
@@ -118,6 +150,54 @@ class TrackingService : Service() {
                 //If sign in fails, then log the error//
                 //Log.e(FIREBASE_AUTH, "Firebase authentication failed")
             }
+        }
+    }
+
+    //Initiate the request to track the device's location//
+    private fun requestLocationUpdates2() {
+        val request = LocationRequest.create()
+
+        // API Ref for Location:
+        // https://developer.android.com/reference/android/location/Location?hl=es-419
+
+        //Specify how often your app should request the device’s location//
+        request.interval = 15000 //ms
+        request.fastestInterval = 9000 //ms
+
+        //Get the most accurate location data available//
+        request.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        val client = LocationServices.getFusedLocationProviderClient(this)
+        //val path = getString(R.string.firebase_path)
+        val permission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION)
+
+        //If the app currently has access to the location permission...//
+        if (permission == PackageManager.PERMISSION_GRANTED) {
+
+            //...then request location updates//
+            client.requestLocationUpdates(request, object : LocationCallback() {
+
+                override fun onLocationResult(locationResult: LocationResult) {
+
+                    //Get a reference to the database, so your app can perform R & W operations//
+                    //val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
+                    //        + "/" + kotlin.math.abs(Random.nextInt()).toString())
+
+                    val location = locationResult.lastLocation
+                    //Save the location data to the database//
+
+                    //Creating a location map without unnecessary data
+                    val entry = mapOf("accuracy" to location.accuracy, "latitude"
+                            to location.latitude, "longitude" to location.longitude,
+                        "speed" to location.speed, "time" to location.time)
+
+                    Log.d("Location", "Location: $entry")
+                    //ref.setValue(entry)
+
+
+                }
+            }, null)
         }
     }
 
