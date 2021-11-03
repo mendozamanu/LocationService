@@ -10,44 +10,24 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.os.StrictMode
+import android.os.StrictMode.ThreadPolicy
 import android.util.Log
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.google.firebase.firestore.FirebaseFirestore
-import io.realm.Realm
-import io.realm.RealmObject
-import io.realm.annotations.PrimaryKey
-import io.realm.kotlin.createObject
-import io.realm.mongodb.App
-import io.realm.mongodb.AppConfiguration
-import io.realm.mongodb.Credentials
-import io.realm.mongodb.User
-import io.realm.mongodb.sync.SyncConfiguration
-import org.bson.types.ObjectId
+import com.mongodb.ConnectionString
+import com.mongodb.MongoClientSettings
+import com.mongodb.client.MongoClient
+import com.mongodb.client.MongoClients
+import com.mongodb.client.MongoCollection
+import com.mongodb.client.MongoDatabase
+import org.bson.Document
 
 
-
-
-
-class FirebaseUtils {
-    val fireStoreDatabase = FirebaseFirestore.getInstance()
-
-}
-
-open class Location(
-    @PrimaryKey var _id: ObjectId? = null,
-    var accuracy: Float = 0.0F,
-    var latitude: Double = 0.0,
-    var longitude: Double = 0.0,
-    var speed: Float = 0.0F,
-    var time: Long = 0
-
-): RealmObject()
 
 class TrackingService : Service() {
     override fun onBind(intent: Intent): IBinder? {
@@ -102,6 +82,7 @@ class TrackingService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
 
             //Unregister the BroadcastReceiver when the notification is tapped//
+            //uiThreadRealm.close()
             unregisterReceiver(this)
 
             //Revisar el IntentReceiver de Realm
@@ -116,76 +97,33 @@ class TrackingService : Service() {
 
     private fun loginToMongo(){
 
-        Realm.init(this)
-        //mongodb+srv://testuser:PanCakes@realmcluster.8nqr0.mongodb.net/locationUpdates?retryWrites=true&w=majority
-        val appID = "location-track-timdi"
-        val app = App(AppConfiguration.Builder(appID)
-            .build())
+        val connectionString =
+            ConnectionString("mongodb://150.214.117.48:27017/todo?retryWrites=true&w=majority")
+        Log.d("Connect to", connectionString.toString())
+        val settings = MongoClientSettings.builder()
+            .applyConnectionString(connectionString)
+            .applicationName("location")
+            .build()
+        val mongoClient: MongoClient = MongoClients.create(settings)
 
-        val emailPasswordCredentials: Credentials = Credentials.emailPassword(
-            getString(R.string.test_email), getString(R.string.test_password)
-        )
-        var user: User?
-        app.loginAsync(emailPasswordCredentials){
-            if (it.isSuccess){
-                Log.i("LoginOK", "Successfully authenticated with test user")
-                user = app.currentUser()
-                val partitionValue = "Location"
-                val config = SyncConfiguration.Builder(user!!, partitionValue)
-                    //RealmConfiguration.Builder.allowWritesOnUiThread(true)
-                    .build()
-                var realm: Realm
-                Realm.getInstanceAsync(config, object: Realm.Callback() {
-                    override fun onSuccess(_realm: Realm) {
-                        // the realm should live exactly as long as the activity, so assign the realm to a member variable
-                        realm = _realm
-                    }
-                })
-                requestLocationUpdates2()
-            }
-            else{
-                Toast.makeText(
-                    this,
-                    "MongoDB realm authentication error. Try again or contact admin",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
+        val database: MongoDatabase = mongoClient.getDatabase("todo")
 
-    }
-/*
-    private fun loginToFirebase() {
-
-        //Add here AppCheck to allow only the app to access to the firebase project
-        //https://firebase.google.com/docs/app-check/android/safetynet-provider?authuser=0#kotlin+ktx
-
-        //Authenticate with Firebase, using the email and password we created earlier//
-        val email = getString(R.string.test_email)
-        val password = getString(R.string.test_password)
-
-        //Call OnCompleteListener if the user is signed in successfully//
-        FirebaseAuth.getInstance().signInWithEmailAndPassword(
-            email, password
-        ).addOnCompleteListener { task ->
-            //If the user has been authenticated...//
-            if (task.isSuccessful) {
-                //...then call requestLocationUpdates//
-                requestLocationUpdates2()
-                //Log.d("LoginOK", "requesting updates...")
-            } else {
-                Toast.makeText(
-                    this,
-                    "Firebase authentication error. Try again or contact admin",
-                    Toast.LENGTH_SHORT
-                ).show()
-                //If sign in fails, then log the error//
-                //Log.e(FIREBASE_AUTH, "Firebase authentication failed")
-            }
-        }
-    }
+        /*val pojoCodecRegistry = CodecRegistries.fromRegistries(
+            AppConfiguration.DEFAULT_BSON_CODEC_REGISTRY,
+            CodecRegistries.fromProviders(
+                PojoCodecProvider.builder().automatic(true).build()))
 */
+        val mongoCollection =
+            database.getCollection(
+                "Location")//, Location::class.java).withCodecRegistry(pojoCodecRegistry)
+        Log.v("EXAMPLE", "Successfully instantiated the MongoDB collection handle")
+
+        requestLocationUpdates2(mongoCollection)
+
+    }
+
     //Initiate the request to track the device's location//
-    private fun requestLocationUpdates2() {
+    private fun requestLocationUpdates2(mongoCollection: MongoCollection<Document>) {
         val request = LocationRequest.create()
 
         //https://docs.mongodb.com/realm/sdk/android/examples/mongodb-remote-access/
@@ -213,66 +151,10 @@ class TrackingService : Service() {
 
                 override fun onLocationResult(locationResult: LocationResult) {
 
-                    //Get a reference to the database, so your app can perform R & W operations//
-                    //val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
-                    //        + "/" + kotlin.math.abs(Random.nextInt()).toString())
+                    val policy = ThreadPolicy.Builder().permitAll().build()
 
-                    val location = locationResult.lastLocation
-                    //Save the location data to the database//
+                    StrictMode.setThreadPolicy(policy)
 
-                    //Creating a location map without unnecessary data
-                    //val entry = mapOf("accuracy" to location.accuracy, "latitude"
-                    //        to location.latitude, "longitude" to location.longitude,
-                    //    "speed" to location.speed, "time" to location.time)
-
-                    Log.d("Location", "Location: $location")
-                    //ref.setValue(entry)
-
-                    val realm = Realm.getDefaultInstance()
-                    realm.executeTransactionAsync { realm ->
-                        val entry = realm.createObject<Location>(ObjectId())
-                        entry.accuracy = location.accuracy
-                        entry.latitude  = location.latitude
-                        entry.longitude = location.longitude
-                        entry.speed = location.speed
-                        entry.time = location.time
-                    }
-
-                }
-            }, null)
-        }
-    }
-/*
-    //Initiate the request to track the device's location//
-    private fun requestLocationUpdates() {
-        val request = LocationRequest.create()
-
-        // API Ref for Location:
-        // https://developer.android.com/reference/android/location/Location?hl=es-419
-
-        //Specify how often your app should request the device’s location//
-        request.interval = 15000 //ms
-        request.fastestInterval = 9000 //ms
-
-        //Get the most accurate location data available//
-        request.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-        val client = LocationServices.getFusedLocationProviderClient(this)
-        //val path = getString(R.string.firebase_path)
-        val permission = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_FINE_LOCATION)
-
-        //If the app currently has access to the location permission...//
-        if (permission == PackageManager.PERMISSION_GRANTED) {
-
-            //...then request location updates//
-            client.requestLocationUpdates(request, object : LocationCallback() {
-
-                override fun onLocationResult(locationResult: LocationResult) {
-                    val oref = FirebaseUtils().fireStoreDatabase.document("users/$uid/")
-                    oref.set(mapOf("uid" to uid))
-                    val ref = FirebaseUtils().fireStoreDatabase.collection(
-                        "users/$uid/location/")
                     //Get a reference to the database, so your app can perform R & W operations//
                     //val ref = FirebaseDatabase.getInstance(path).getReference("users/" + uid
                     //        + "/" + kotlin.math.abs(Random.nextInt()).toString())
@@ -283,20 +165,19 @@ class TrackingService : Service() {
                     //Creating a location map without unnecessary data
                     val entry = mapOf("accuracy" to location.accuracy, "latitude"
                             to location.latitude, "longitude" to location.longitude,
-                            "speed" to location.speed, "time" to location.time)
+                           "speed" to location.speed, "time" to location.time)
 
-                    //Log.d("Location", "Location: $entry")
+                    Log.d("Location", "Location: $location")
+
                     //ref.setValue(entry)
+                    val inserted = mongoCollection.insertOne(Document(entry))
+                    Log.d("INSERTED", inserted.toString())
 
-                    ref.add(entry)
-                        .addOnSuccessListener {
-                            Log.d("DB", "Added document with ID $uid")
-                        }
                 }
             }, null)
         }
     }
-*/
+
     companion object {
         private const val CHANNEL_ID = 1945
         //val uid = kotlin.math.abs(Random.nextInt()).toString()
