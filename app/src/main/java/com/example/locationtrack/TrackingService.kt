@@ -8,11 +8,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -20,7 +19,6 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import io.realm.Realm
 import io.realm.RealmObject
-import io.realm.Sort
 import io.realm.annotations.PrimaryKey
 import io.realm.mongodb.App
 import io.realm.mongodb.AppConfiguration
@@ -32,7 +30,7 @@ import org.bson.types.ObjectId
 
 open class Location(
     @PrimaryKey var _id: ObjectId? = ObjectId(),
-    var _partition: String = "",
+    var _uid: String = "",
     var accuracy: Float = 0.0F,
     var latitude: Double = 0.0,
     var longitude: Double = 0.0,
@@ -49,7 +47,6 @@ class TrackingService : Service() {
         return null
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -64,22 +61,23 @@ class TrackingService : Service() {
         val descriptionText = getString(R.string.channel_description)
         val importance = NotificationManager.IMPORTANCE_DEFAULT
         val channel = NotificationChannel(CHANNEL_ID.toString(), name, importance).apply {
-            description = descriptionText
+                description = descriptionText
         }
+
         // Register the channel with the system
         val notificationManager: NotificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
+
     }
 
     //Create the persistent notification//
-    @SuppressLint("UnspecifiedImmutableFlag")
     private fun buildNotification() {
 
         val stop = "stop"
         registerReceiver(stopReceiver, IntentFilter(stop))
         val broadcastIntent = PendingIntent.getBroadcast(
-            this, 0, Intent(stop), PendingIntent.FLAG_UPDATE_CURRENT
+            this, 0, Intent(stop), PendingIntent.FLAG_IMMUTABLE
         )
 
         // Create the persistent notification//
@@ -89,6 +87,7 @@ class TrackingService : Service() {
             //Make this notification ongoing so it can’t be dismissed by the user//
             .setOngoing(true)
             .setContentIntent(broadcastIntent)
+            //.addAction(1, "Stop", broadcastIntent)
             .setSmallIcon(R.drawable.ic_tracking_enabled)
         startForeground(1, builder.build())
     }
@@ -113,7 +112,7 @@ class TrackingService : Service() {
     private fun loginToMongo(){
 
         Realm.init(applicationContext)
-        val appID = "location-track-timdi"
+        val appID = getString(R.string.app_id)
         val app = App(AppConfiguration.Builder(appID)
             .build())
 
@@ -136,10 +135,8 @@ class TrackingService : Service() {
                         // the realm should live exactly as long as the activity, so assign
                         // the realm to a member variable
                         syncedRealm = _realm
-
                         requestLocationUpdates2(syncedRealm!!)
                     }
-
                 })
 
             }
@@ -182,36 +179,50 @@ class TrackingService : Service() {
             //...then request location updates//
             client.requestLocationUpdates(request, object : LocationCallback() {
 
+                @SuppressLint("HardwareIds")
                 override fun onLocationResult(locationResult: LocationResult) {
 
+                    var data: Location?
+                    val androidId = Settings.Secure.getString(
+                        contentResolver,
+                        Settings.Secure.ANDROID_ID
+                    )
 
                     val location = locationResult.lastLocation
                     //Save the location data to the database//
 
                     Log.d("Location", "Location: $location")
 
-                    realm.beginTransaction()
+                    if (!realm.isClosed){
+                        realm.executeTransaction { transact: Realm ->
 
-                    //Creating location data to sync
-                    val data = Location(ObjectId(), "Location", location.accuracy,
-                        location.latitude, location.longitude, location.speed, location.time)
+                            //Creating location data to sync
+                            data = transact.createObject(Location::class.java, ObjectId())
+                            data?._uid = androidId
+                            data?.accuracy = location.accuracy
+                            data?.latitude = location.latitude
+                            data?.longitude = location.longitude
+                            data?.speed = location.speed
+                            data?.time = location.time
+                        }
 
-                    realm.insert(data)
-                    realm.commitTransaction()
-
-                    val locquery = realm.where(Location::class.java)
-                    val results = locquery.sort("time", Sort.DESCENDING).findAll()
-                    Log.d ("QUERY", results.toString())
-
+                        /*val query = realm.where(Location::class.java)
+                        val results = query.sort("time", Sort.DESCENDING).findAll()
+                        Log.d ("QUERY", results.toString())
+                        */
+                    }
+                    else{
+                        return //if the realm is closed stop getting location updates
+                    }
                 }
             }, null)
 
         }
     }
 
-
     companion object {
         private const val CHANNEL_ID = 1945
         //val uid = kotlin.math.abs(Random.nextInt()).toString()
     }
+
 }
