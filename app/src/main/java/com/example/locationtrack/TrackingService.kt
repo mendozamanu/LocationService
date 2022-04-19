@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -215,7 +216,7 @@ class TrackingService : Service() {
                         return //if the realm is closed stop getting location updates
                     }
                 }
-            }, null)
+            }, Looper.getMainLooper())
 
         }
     }
